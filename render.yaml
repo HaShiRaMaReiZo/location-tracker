@@ -2,7 +2,7 @@ services:
   - type: web
     name: location-tracker
     env: go
-    buildCommand: go build -o location_tracker
+    buildCommand: go mod download && go mod tidy && go build -o location_tracker
     startCommand: ./location_tracker
     envVars:
       - key: LARAVEL_API_URL
