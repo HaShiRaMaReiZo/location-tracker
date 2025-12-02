@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: location-tracker
+    env: go
+    buildCommand: go build -o location_tracker
+    startCommand: ./location_tracker
+    envVars:
+      - key: LARAVEL_API_URL
+        value: https://ok-delivery.onrender.com
+      # PORT is automatically set by Render, no need to specify
+
