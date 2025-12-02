@@ -162,8 +162,16 @@ func (c *Client) readPump() {
 	for {
 		_, _, err := c.conn.ReadMessage()
 		if err != nil {
+			// Check error message - 1005 (no status) is normal when client disconnects abruptly
+			errStr := err.Error()
+			if errStr == "websocket: close 1005 (no status)" || 
+			   errStr == "websocket: close 1006 (abnormal closure)" {
+				// Normal disconnection - don't log
+				break
+			}
+			// Only log unexpected errors
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
+				log.Printf("WebSocket read error: %v", err)
 			}
 			break
 		}
