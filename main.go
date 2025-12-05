@@ -83,8 +83,16 @@ func (h *Hub) run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			channels := h.getClientChannels(client)
-			log.Printf("Client registered: user_id=%d, role=%s, merchant_id=%v, package_id=%v, channels=%v", 
-				client.userID, client.userRole, client.merchantID, client.packageID, channels)
+			merchantIDStr := "nil"
+			packageIDStr := "nil"
+			if client.merchantID != nil {
+				merchantIDStr = fmt.Sprintf("%d", *client.merchantID)
+			}
+			if client.packageID != nil {
+				packageIDStr = fmt.Sprintf("%d", *client.packageID)
+			}
+			log.Printf("Client registered: user_id=%d, role=%s, merchant_id=%s, package_id=%s, channels=%v", 
+				client.userID, client.userRole, merchantIDStr, packageIDStr, channels)
 			for _, channel := range channels {
 				if h.clients[channel] == nil {
 					h.clients[channel] = make(map[*Client]bool)
