@@ -83,6 +83,8 @@ func (h *Hub) run() {
 		case client := <-h.register:
 			h.mu.Lock()
 			channels := h.getClientChannels(client)
+			log.Printf("Client registered: user_id=%d, role=%s, merchant_id=%v, package_id=%v, channels=%v", 
+				client.userID, client.userRole, client.merchantID, client.packageID, channels)
 			for _, channel := range channels {
 				if h.clients[channel] == nil {
 					h.clients[channel] = make(map[*Client]bool)
@@ -112,14 +114,19 @@ func (h *Hub) run() {
 					"event": message.Event,
 					"data":  message.Data,
 				})
+				log.Printf("Broadcasting to channel '%s': %d clients, message: %s", message.Channel, len(clients), string(data))
 				for client := range clients {
 					select {
 					case client.send <- data:
+						log.Printf("Message sent to client (user_id=%d, role=%s)", client.userID, client.userRole)
 					default:
+						log.Printf("Client send channel full, closing connection (user_id=%d)", client.userID)
 						close(client.send)
 						delete(clients, client)
 					}
 				}
+			} else {
+				log.Printf("No clients subscribed to channel '%s'", message.Channel)
 			}
 			h.mu.RUnlock()
 		}
@@ -264,6 +271,9 @@ func handleLocationUpdate(hub *Hub) http.HandlerFunc {
 
 		// Get package status from request (Laravel will send it)
 		packageStatus := r.URL.Query().Get("package_status")
+		
+		log.Printf("Location update received: rider_id=%d, lat=%.6f, lng=%.6f, package_id=%v, status=%s", 
+			update.RiderID, update.Latitude, update.Longitude, update.PackageID, packageStatus)
 
 		// Broadcast to office channel (office can always see all riders)
 		hub.broadcast <- BroadcastMessage{
@@ -274,11 +284,16 @@ func handleLocationUpdate(hub *Hub) http.HandlerFunc {
 
 		// Broadcast to merchant package channel ONLY if package_id exists AND status is "on_the_way"
 		if update.PackageID != nil && packageStatus == "on_the_way" {
+			channelName := "merchant.package." + intToString(*update.PackageID) + ".location"
+			log.Printf("Broadcasting to merchant channel: %s", channelName)
 			hub.broadcast <- BroadcastMessage{
-				Channel: "merchant.package." + intToString(*update.PackageID) + ".location",
+				Channel: channelName,
 				Event:   "rider.location.updated",
 				Data:    update,
 			}
+		} else {
+			log.Printf("Skipping merchant broadcast: package_id=%v, status=%s (need: on_the_way)", 
+				update.PackageID, packageStatus)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
